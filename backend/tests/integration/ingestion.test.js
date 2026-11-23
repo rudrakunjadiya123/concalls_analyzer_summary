@@ -13,17 +13,19 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "../../src/app.js";
 import { readConfig } from "../../src/config/env.js";
-import { openDatabase } from "../../src/db/connection.js";
-import { migrateDatabase } from "../../src/db/migrate.js";
-import { seedWatchlist } from "../../src/db/seed.js";
+import { openDatabase } from "../../src/config/database.js";
+import { migrateDatabase } from "../../src/models/migrate.js";
+import { seedWatchlist } from "../../src/models/seed.js";
 import { startApi } from "../../src/index.js";
-import { sha256 } from "../../src/core/hash.js";
-import { createIngestionService } from "../../src/ingestion/service.js";
-import { createSources } from "../../src/sources/factory.js";
-import { downloadDocument } from "../../src/ingestion/download.js";
-import { createJobRepository } from "../../src/jobs/repository.js";
-import { withPipelineLease } from "../../src/scheduler/lease.js";
-import { summaryContext } from "../../src/summary/context.js";
+import { sha256 } from "../../src/utils/hash.js";
+import { PipelineError } from "../../src/utils/errors.js";
+import { createMockProvider } from "../../src/services/ai/mock.js";
+import { createIngestionService } from "../../src/services/ingestion/service.js";
+import { createSources } from "../../src/services/sources/factory.js";
+import { downloadDocument } from "../../src/services/ingestion/download.js";
+import { createJobRepository } from "../../src/models/jobs/repository.js";
+import { withPipelineLease } from "../../src/services/scheduler/lease.js";
+import { summaryContext } from "../../src/services/summary/context.js";
 import {
   makeFixturePdf,
   transcriptPages,
@@ -55,6 +57,9 @@ function config(env = {}) {
     INITIAL_BACKFILL_DAYS: "2",
     MAX_JOB_ATTEMPTS: "2",
     WORKER_LEASE_SECONDS: "3",
+    ...(env.DATA_MODE === "authorized-direct" && {
+      GEMINI_API_KEY: "synthetic-test-key",
+    }),
     ...env,
   });
 }
@@ -83,10 +88,17 @@ function verifiedCompany() {
 
 const count = (table) =>
   db.prepare(`SELECT count(*) FROM ${table}`).pluck().get();
+const offlineGemini = {
+  id: "gemini",
+  model: "offline-test",
+  isMock: false,
+  status: () => ({ configured: false }),
+};
 const ingress = (cfg, open, resolve = fakeAddresses, extra = {}) =>
   createIngestionService(db, cfg, {
     clock,
     network: { open, resolve, ...extra },
+    aiProvider: cfg.AI_PROVIDER === "gemini" ? offlineGemini : undefined,
   });
 
 const nseTranscript = (id, name, company = "INFY", at = "09:59:00") => ({
@@ -119,12 +131,7 @@ it("imports browser-saved PDFs through the shared pipeline with exchange polling
     GEMINI_API_KEY: "test-key-never-sent",
   });
   // Keep the local workflow under test offline, including when explicit consent is added.
-  const provider = {
-    id: "gemini",
-    model: "offline-test",
-    isMock: false,
-    status: () => ({ configured: false }),
-  };
+  const provider = offlineGemini;
   const service = createIngestionService(db, cfg, {
     clock,
     aiProvider: provider,
@@ -182,42 +189,76 @@ it("imports browser-saved PDFs through the shared pipeline with exchange polling
   );
 });
 
-it("publishes verified local archive evidence without a model or a fabricated original link", async () => {
-  verifiedCompany();
-  const cfg = config({
-    DATA_MODE: "authorized-direct",
-    AI_PROVIDER: "extractive",
-  });
-  const service = createIngestionService(db, cfg, { clock });
-  const filePath = path.join(root, "test-archive.pdf");
-  const bytes = makeFixturePdf([
-    [
-      [40, 745, "National Stock Exchange of India Limited"],
-      [40, 705, "Test filing of earnings conference call transcript"],
-    ],
-    ...transcriptPages(),
-  ]);
-  writeFileSync(filePath, bytes);
-  expect(
-    await service.importPdf({
-      authorized: true,
-      summarize: true,
-      filePath,
-      company: "INFY",
-      archiveExchange: "NSE",
-    }),
-  ).toMatchObject({ imported: true, gemini_authorized: false });
-  const row = db
-    .prepare("SELECT ai_provider,is_mock,json_payload FROM summaries")
-    .get();
-  expect(row).toMatchObject({ ai_provider: "extractive", is_mock: 0 });
-  expect(JSON.parse(row.json_payload)).toMatchObject({
-    source: "NSE",
-    source_url: null,
-  });
-  expect(count("outbox_events")).toBe(1);
-  expect(count("summary_evidence")).toBeGreaterThan(2);
-});
+it.each([true, false])(
+  "requires a Gemini response to publish a local archive (available=%s)",
+  async (available) => {
+    verifiedCompany();
+    const cfg = config({
+      DATA_MODE: "authorized-direct",
+    });
+    const fixtureProvider = createMockProvider();
+    const provider = {
+      id: "gemini",
+      model: "synthetic-gemini-test",
+      isMock: false,
+      status: () => ({ configured: true }),
+      generateFacts: vi.fn((input) => {
+        if (!available)
+          throw new PipelineError("AI_UNAVAILABLE", undefined, {
+            retryable: true,
+          });
+        return fixtureProvider.generateFacts(input);
+      }),
+      synthesize: vi.fn(fixtureProvider.synthesize),
+    };
+    const service = createIngestionService(db, cfg, {
+      clock,
+      aiProvider: provider,
+    });
+    const filePath = path.join(root, "test-archive.pdf");
+    const bytes = makeFixturePdf([
+      [
+        [40, 745, "National Stock Exchange of India Limited"],
+        [40, 705, "Test filing of earnings conference call transcript"],
+      ],
+      ...transcriptPages(),
+    ]);
+    writeFileSync(filePath, bytes);
+    expect(
+      await service.importPdf({
+        authorized: true,
+        summarize: true,
+        filePath,
+        company: "INFY",
+        archiveExchange: "NSE",
+      }),
+    ).toMatchObject({ imported: true, gemini_authorized: true });
+    expect(provider.generateFacts).toHaveBeenCalled();
+    if (!available) {
+      expect(provider.synthesize).not.toHaveBeenCalled();
+      expect(count("summaries")).toBe(0);
+      expect(count("outbox_events")).toBe(0);
+      expect(
+        db
+          .prepare("SELECT status FROM processing_jobs WHERE step='summarize'")
+          .pluck()
+          .get(),
+      ).toBe("retry_wait");
+      return;
+    }
+    expect(provider.synthesize).toHaveBeenCalled();
+    const row = db
+      .prepare("SELECT ai_provider,is_mock,json_payload FROM summaries")
+      .get();
+    expect(row).toMatchObject({ ai_provider: "gemini", is_mock: 0 });
+    expect(JSON.parse(row.json_payload)).toMatchObject({
+      source: "NSE",
+      source_url: null,
+    });
+    expect(count("outbox_events")).toBe(1);
+    expect(count("summary_evidence")).toBeGreaterThan(2);
+  },
+);
 
 it("rejects unauthorized, unverified, untrusted and non-PDF local inputs before persisting a filing", async () => {
   const cfg = config({ DATA_MODE: "authorized-direct" });
@@ -337,9 +378,9 @@ it("can select one market-wide document every five minutes and permanently skip 
   expect(status()).toMatchObject({
     interval_seconds: 300,
     result: "success",
-    new_candidates: 3,
+    new_candidates: 4,
     selected_documents: 1,
-    discarded_candidates: 2,
+    discarded_candidates: 3,
   });
   expect(count("source_filings")).toBe(4);
   expect(count("download_targets")).toBe(4);
@@ -396,7 +437,7 @@ it("can select one market-wide document every five minutes and permanently skip 
   time += 300_000;
   nse[1] = {
     ...nse[1],
-    desc: "Corrected conference call transcript",
+    attchmntText: "Corrected conference call transcript",
     exchdisstime: "2026-10-26T10:07:00Z",
   };
   nse.push(nseTranscript("four", "fresh-transcript", "INFY", "10:08:00"));
@@ -494,16 +535,93 @@ it("resumes a partly committed live scan after restart without choosing a second
   expect(count("processing_jobs")).toBe(1);
 });
 
-it("deduplicates NSE and BSE mirrors with different URLs and holds conflicting issuers for review", async () => {
+it("checks poll subject and description, including approved XBRL, before selecting PDFs", async () => {
+  verifiedCompany();
+  time = Date.parse("2026-10-26T10:00:00Z");
+  const rows = [
+    {
+      ...nseTranscript("wrong-subject", "wrong-subject"),
+      desc: "General Updates",
+    },
+    {
+      ...nseTranscript("no-word", "transcript"),
+      attchmntText: "Meeting schedule and transcription",
+    },
+    {
+      ...nseTranscript("checked-xml", "xml"),
+      attchmntFile: null,
+      attchmntText: "",
+      xbrl: `${origin}/announcement.xml`,
+    },
+    { ...nseTranscript("wrong-xml", "wrong-xml"), xbrl: `${origin}/wrong.xml` },
+    { ...nseTranscript("bad-xml", "bad-xml"), xbrl: `${origin}/malformed.xml` },
+    {
+      ...nseTranscript("unapproved-xml", "unapproved"),
+      xbrl: "https://unapproved.example.invalid/attachment.xml",
+    },
+  ];
+  const open = vi.fn((url) => {
+    if (url.hostname === "nse.example.invalid") return response(rows);
+    if (url.pathname === "/malformed.xml")
+      return response("<xbrl><Description>transcript</xbrl>", 200, {
+        "content-type": "application/xml",
+      });
+    const detail =
+      url.pathname === "/wrong.xml"
+        ? "Meeting schedule"
+        : "Earnings call TRANSCRIPT";
+    return response(
+      `<xbrl xmlns:a="urn:fixture:announcement"><a:Description>${detail}</a:Description>
+      <a:CallDate>2026-10-26</a:CallDate><a:Quarter>Q2 FY27</a:Quarter>
+      <a:PDFURL>${origin}/reviewed.pdf</a:PDFURL></xbrl>`,
+      200,
+      { "content-type": "application/xbrl+xml" },
+    );
+  });
+  const cfg = direct({
+    BSE_ACCESS_AUTHORIZED: "false",
+    LIVE_MAX_DOCUMENTS_PER_POLL: "0",
+  });
+  const service = ingress(cfg, open);
+  expect(await service.watcher.tick({ automatic: true })).toMatchObject([
+    { queued: 1 },
+  ]);
+  expect(open.mock.calls.map(([url]) => url.pathname)).toEqual([
+    "/announcements",
+    "/announcement.xml",
+    "/wrong.xml",
+    "/malformed.xml",
+  ]);
+  expect(
+    db
+      .prepare(
+        "SELECT source_filing_id, call_date_hint, quarter_hint, attachment_url FROM source_filings",
+      )
+      .all(),
+  ).toEqual([
+    {
+      source_filing_id: "checked-xml",
+      call_date_hint: "2026-10-26",
+      quarter_hint: "Q2 FY27",
+      attachment_url: `${origin}/reviewed.pdf`,
+    },
+  ]);
+  time += 300_000;
+  rows.push(nseTranscript("new-poll", "fresh", "INFY", "10:04:00"));
+  expect(await service.watcher.tick({ automatic: true })).toMatchObject([
+    { queued: 1 },
+  ]);
+  expect(count("download_targets")).toBe(2);
+});
+
+it("links matching NSE and BSE call metadata and PDF hashes and holds conflicting issuers for review", async () => {
   verifiedCompany();
   time = Date.parse("2026-10-26T10:00:00Z");
   const bseRows = [];
   const nse = nseTranscript("nse-original", "nse-original");
   const open = vi.fn((url) => {
     if (url.origin === origin)
-      return response(
-        makeFixturePdf(transcriptPages(), { wrapper: url.pathname }),
-      );
+      return response(makeFixturePdf(transcriptPages()));
     if (url.hostname === "nse.example.invalid") return response([nse]);
     const scrip = url.searchParams.get("strScrip");
     const rows = scrip
@@ -538,7 +656,7 @@ it("deduplicates NSE and BSE mirrors with different URLs and holds conflicting i
     NEWS_DT: "2026-10-26T10:04:00Z",
   });
   await selectAndProcess();
-  expect(count("documents")).toBe(2);
+  expect(count("documents")).toBe(1);
   expect(count("transcripts")).toBe(1);
   expect(count("concall_events")).toBe(1);
   const confirmedSources = db
@@ -575,6 +693,74 @@ it("deduplicates NSE and BSE mirrors with different URLs and holds conflicting i
     transcript_id: null,
   });
 });
+
+it.each(["different bytes", "conflicting call date", "conflicting quarter"])(
+  "does not link cross-exchange mirrors with %s",
+  async (difference) => {
+    verifiedCompany();
+    let listBse = false;
+    const nse = nseTranscript("original", "original");
+    const bse = {
+      ...bsePage1.Table[0],
+      NEWSID: "bse-candidate",
+      ATTACHMENT_URL: `${origin}/candidate.pdf`,
+      XBRL_URL:
+        difference === "different bytes" ? undefined : `${origin}/bse.xml`,
+      NEWS_DT: "2026-10-26T09:59:00Z",
+    };
+    const open = vi.fn((url) => {
+      if (url.hostname === "nse.example.invalid") return response([nse]);
+      if (url.hostname === "bse.example.invalid")
+        return response({
+          Table: listBse ? [bse] : [],
+          Table1: [{ ROWCNT: Number(listBse) }],
+        });
+      if (url.pathname === "/bse.xml")
+        return response(
+          difference === "conflicting call date"
+            ? "<xbrl><CallDate>2026-10-25</CallDate></xbrl>"
+            : "<xbrl><Quarter>Q1 FY27</Quarter></xbrl>",
+          200,
+          { "content-type": "application/xml" },
+        );
+      return response(
+        makeFixturePdf(transcriptPages(), {
+          wrapper: difference === "different bytes" ? url.pathname : "",
+        }),
+      );
+    });
+    const cfg = direct();
+    const service = ingress(cfg, open);
+    await service.once({ processAi: false });
+    listBse = true;
+    time += 300_000;
+    await service.once({ processAi: false });
+    const bseReview = db
+      .prepare(
+        `SELECT r.decision, r.transcript_id FROM document_reviews r
+       JOIN document_sources s ON s.id = r.source_id
+       JOIN source_filings f ON f.id = s.filing_id WHERE f.source = 'BSE'`,
+      )
+      .get();
+    if (difference === "different bytes") {
+      expect(count("documents")).toBe(2);
+      expect(count("transcripts")).toBe(2);
+      expect(
+        db
+          .prepare("SELECT count(DISTINCT clean_text_sha256) FROM transcripts")
+          .pluck()
+          .get(),
+      ).toBe(1);
+    } else {
+      expect(count("documents")).toBe(1);
+      expect(count("transcripts")).toBe(1);
+      expect(bseReview).toEqual({
+        decision: "cross_exchange_metadata_review",
+        transcript_id: null,
+      });
+    }
+  },
+);
 
 it("stores local fixture PDFs, validates hashes and stays idempotent across reboots", async () => {
   const open = vi.fn();
@@ -645,7 +831,7 @@ it("deduplicates a cross-exchange attachment and preserves a same-URL correction
           ? [
               {
                 ...nseResponse[0],
-                desc: "Corrected conference call transcript",
+                attchmntText: "Corrected conference call transcript",
                 an_dt: "27-Oct-2026 16:30:00",
               },
             ]
@@ -659,16 +845,16 @@ it("deduplicates a cross-exchange attachment and preserves a same-URL correction
   const service = ingress(direct(), open);
   expect(await service.once()).toMatchObject({ downloads: { completed: 2 } });
   expect(open.mock.calls.filter(([url]) => url.origin === origin)).toHaveLength(
-    1,
+    2,
   );
-  expect(count("source_filings")).toBe(3);
+  expect(count("source_filings")).toBe(2);
   expect(count("documents")).toBe(1);
   expect(count("filing_documents")).toBe(2);
   revised = true;
   time = new Date("2026-10-28T09:00:00Z").getTime();
   expect(await service.once()).toMatchObject({ downloads: { completed: 3 } });
   expect(count("documents")).toBe(2);
-  expect(count("filing_observations")).toBe(4);
+  expect(count("filing_observations")).toBe(3);
   expect(count("filing_documents")).toBe(3);
   expect(
     db
@@ -683,13 +869,13 @@ it("deduplicates a cross-exchange attachment and preserves a same-URL correction
     db
       .prepare(
         `SELECT count(*) FROM filing_observations
-    WHERE json_extract(normalized_json, '$.subject') = 'Corrected conference call transcript'`,
+    WHERE json_extract(normalized_json, '$.description') = 'Corrected conference call transcript'`,
       )
       .pluck()
       .get(),
   ).toBe(1);
   expect(open.mock.calls.filter(([url]) => url.origin === origin)).toHaveLength(
-    2,
+    3,
   );
   expect(count("ai_runs")).toBe(0);
   expect(count("summaries")).toBe(0);

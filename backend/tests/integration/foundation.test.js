@@ -16,12 +16,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { rawMetadataSchema } from "@finosauras/shared";
 import { createApp } from "../../src/app.js";
 import { readConfig } from "../../src/config/env.js";
-import { atomicWrite } from "../../src/core/storage.js";
-import { openDatabase } from "../../src/db/connection.js";
-import { migrateDatabase } from "../../src/db/migrate.js";
-import { encodeJson, decodeJson } from "../../src/db/queries.js";
-import { seedWatchlist } from "../../src/db/seed.js";
-import { verifyWatchlist } from "../../src/db/verifyWatchlist.js";
+import { atomicWrite } from "../../src/utils/storage.js";
+import { openDatabase } from "../../src/config/database.js";
+import { migrateDatabase } from "../../src/models/migrate.js";
+import { encodeJson, decodeJson } from "../../src/models/queries.js";
+import { seedWatchlist } from "../../src/models/seed.js";
+import { verifyWatchlist } from "../../src/models/verifyWatchlist.js";
 import { startApi } from "../../src/index.js";
 
 const now = "2026-11-22T18:30:00.000Z";

@@ -4,12 +4,12 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { verifyStoredSummary } from "./verifySummary.js";
 import { readConfig } from "../config/env.js";
-import { openDatabase } from "../db/connection.js";
-import { migrateDatabase } from "../db/migrate.js";
-import { loadExtraction } from "../pdf/artifacts.js";
-import { atomicWrite, readPrivateFile } from "../core/storage.js";
-import { PipelineError, publicError } from "../core/errors.js";
-import { sha256 } from "../core/hash.js";
+import { openDatabase } from "../config/database.js";
+import { migrateDatabase } from "../models/migrate.js";
+import { loadExtraction } from "../services/pdf/artifacts.js";
+import { atomicWrite, readPrivateFile } from "../utils/storage.js";
+import { PipelineError, publicError } from "../utils/errors.js";
+import { sha256 } from "../utils/hash.js";
 
 const grant = z.strictObject({
   summary_id: z.uuid(),

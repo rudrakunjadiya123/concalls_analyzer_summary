@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 export default defineConfig(({ mode }) => {
   const root = fileURLToPath(new URL("../", import.meta.url));
   const env = loadEnv(mode, root, "");
-  const target = `http://127.0.0.1:${process.env.PORT ?? env.PORT ?? "3000"}`;
+  const backend = fileURLToPath(new URL("../backend/", import.meta.url));
+  const backendEnv = loadEnv(mode, backend, "");
+  const target = `http://127.0.0.1:${process.env.PORT ?? backendEnv.PORT ?? env.PORT ?? "3000"}`;
   return {
     plugins: [react(), tailwindcss()],
     server: { proxy: { "/api": { target }, "/ws": { target, ws: true } } },

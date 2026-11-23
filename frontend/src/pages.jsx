@@ -436,6 +436,16 @@ function Evidence({ rows, path }) {
   );
 }
 
+const emptySummarySections = {
+  "Key metrics": "No figures could be verified against the transcript.",
+  "Management commentary": "No additional management remarks were verified.",
+  Guidance: "No explicit management guidance was verified.",
+  "Segment performance":
+    "No business-line or subsidiary results were verified.",
+  "Notable Q&A": "No analyst question and management answer pair was verified.",
+  Risks: "No specific risks were verified in management’s remarks.",
+};
+
 export function Summary({ live }) {
   const { id } = useParams();
   const result = useApi(live.ready ? `/summaries/${id}` : null, live.revision);
@@ -448,7 +458,13 @@ export function Summary({ live }) {
   const section = (name, items, render) => (
     <section className="panel summary-section">
       <h2>{name}</h2>
-      {items.length ? render() : <p className="muted">No verified items.</p>}
+      {items.length ? (
+        render()
+      ) : (
+        <p className="muted">
+          {emptySummarySections[name] ?? "No verified items."}
+        </p>
+      )}
     </section>
   );
   const bullets = (name, key) =>
@@ -556,15 +572,13 @@ export function Summary({ live }) {
                 : "Unverified/mock summarization."}
             </p>
           )}
-          {data.validation.warnings.length > 0 && (
-            <div className="notice alert">
-              Validation warnings
-              <ul>
-                {data.validation.warnings.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </div>
+          {!data.is_current && (
+            <p className="notice">
+              This is an earlier summary.{" "}
+              <Link to={`/companies/${data.company_id}`}>
+                View company history
+              </Link>
+            </p>
           )}
           {evidence.error && (
             <div className="notice error" role="alert">

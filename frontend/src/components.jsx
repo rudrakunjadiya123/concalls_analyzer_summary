@@ -180,5 +180,5 @@ export function SourceLink({ source, url }) {
   } catch {
     /* Unknown or malformed links have no actionable URL. */
   }
-  return <span className="muted">Original filing unavailable</span>;
+  return <span className="muted">Original filing link unverified</span>;
 }

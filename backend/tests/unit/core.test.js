@@ -1,15 +1,15 @@
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { istDate, istLocalToUtc } from "../../src/core/clock.js";
-import { PipelineError, publicError } from "../../src/core/errors.js";
-import { documentStorageKey, sha256 } from "../../src/core/hash.js";
-import { createLogger } from "../../src/core/logger.js";
-import { retryAfterMs, withRetry } from "../../src/core/retry.js";
+import { istDate, istLocalToUtc } from "../../src/utils/clock.js";
+import { PipelineError, publicError } from "../../src/utils/errors.js";
+import { documentStorageKey, sha256 } from "../../src/utils/hash.js";
+import { createLogger } from "../../src/utils/logger.js";
+import { retryAfterMs, withRetry } from "../../src/utils/retry.js";
 import {
   resolveSourceUrl,
   validateSourceUrl,
-} from "../../src/core/security.js";
-import { safePath } from "../../src/core/storage.js";
+} from "../../src/utils/security.js";
+import { safePath } from "../../src/utils/storage.js";
 
 const instant = new Date("2026-11-22T18:30:00.000Z");
 const clock = { now: () => instant };

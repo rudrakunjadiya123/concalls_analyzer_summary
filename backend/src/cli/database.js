@@ -1,10 +1,10 @@
 import { ConfigError, readConfig } from "../config/env.js";
-import { createLogger } from "../core/logger.js";
-import { PipelineError, publicError } from "../core/errors.js";
-import { openDatabase } from "../db/connection.js";
-import { migrateDatabase } from "../db/migrate.js";
-import { seedWatchlist } from "../db/seed.js";
-import { verifyWatchlist } from "../db/verifyWatchlist.js";
+import { createLogger } from "../utils/logger.js";
+import { PipelineError, publicError } from "../utils/errors.js";
+import { openDatabase } from "../config/database.js";
+import { migrateDatabase } from "../models/migrate.js";
+import { seedWatchlist } from "../models/seed.js";
+import { verifyWatchlist } from "../models/verifyWatchlist.js";
 
 // Share initialization with the API so local maintenance uses the same database settings.
 const command = process.argv[2];

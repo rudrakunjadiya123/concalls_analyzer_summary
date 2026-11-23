@@ -1,5 +1,5 @@
 import { WebSocket, WebSocketServer } from "ws";
-import { eventsAfter, latestEventId } from "../routes/browse.js";
+import { eventsAfter, latestEventId } from "../models/outbox.js";
 
 /** Broadcast only committed outbox events, including changes written by another local process. */
 export function attachSummariesSocket(

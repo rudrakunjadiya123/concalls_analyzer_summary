@@ -3,17 +3,18 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { summarySchema, summaryEventSchema } from "@finosauras/shared";
 import { readConfig } from "../config/env.js";
-import { openDatabase } from "../db/connection.js";
-import { migrateDatabase } from "../db/migrate.js";
-import { decodeJson } from "../db/queries.js";
-import { PipelineError, publicError } from "../core/errors.js";
-import { sha256 } from "../core/hash.js";
-import { loadExtraction } from "../pdf/artifacts.js";
-import { draftSchema } from "../ai/contracts.js";
-import { evidenceUnits } from "../ai/chunk.js";
-import { renderMarkdown } from "../summary/markdown.js";
-import { synthesisInput, verifySelection } from "../summary/verify.js";
-import { summaryOutputFingerprint } from "../summary/publish.js";
+import { openDatabase } from "../config/database.js";
+import { migrateDatabase } from "../models/migrate.js";
+import { decodeJson } from "../models/queries.js";
+import { PipelineError, publicError } from "../utils/errors.js";
+import { sha256 } from "../utils/hash.js";
+import { loadExtraction } from "../services/pdf/artifacts.js";
+import { draftSchema } from "../services/ai/contracts.js";
+import { evidenceUnits } from "../services/ai/chunk.js";
+import { summaryEvidenceOptions } from "../services/ai/prompts.js";
+import { renderMarkdown } from "../services/summary/markdown.js";
+import { synthesisInput, verifySelection } from "../services/summary/verify.js";
+import { summaryOutputFingerprint } from "../services/summary/publish.js";
 
 const unsupported = () => new PipelineError("AI_EVIDENCE_UNSUPPORTED");
 
@@ -60,11 +61,13 @@ export async function verifyStoredSummary(
     extraction.manifest.clean_text_sha256 !== summary.clean_text_sha256
   )
     throw unsupported();
-  const units = evidenceUnits(extraction.manifest);
+  const options = summaryEvidenceOptions(summary.prompt_version);
+  const units = evidenceUnits(extraction.manifest, options);
   const checked = synthesisInput(
     draft.mapped_facts,
     units,
     extraction.manifest,
+    options,
   );
   const expected = verifySelection(
     draft.selection,

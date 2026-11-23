@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { readConfig } from "../src/config/env.js";
-import { openDatabase } from "../src/db/connection.js";
+import { openDatabase } from "../src/config/database.js";
 import { startApi } from "../src/index.js";
 
 // Exercise the production bootstrap twice on one isolated data directory and an ephemeral port.

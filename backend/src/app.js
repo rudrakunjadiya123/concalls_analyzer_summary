@@ -2,9 +2,13 @@ import express from "express";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PipelineError, publicError } from "./core/errors.js";
 import { healthRouter } from "./routes/health.js";
 import { browseRouter } from "./routes/browse.js";
+import {
+  createHttpErrorHandler,
+  notFound,
+  setSecurityHeaders,
+} from "./middlewares/http.js";
 
 // Serve the sibling frontend workspace's production build.
 const webRoot = fileURLToPath(new URL("../../frontend/dist/", import.meta.url));
@@ -13,15 +17,7 @@ const webRoot = fileURLToPath(new URL("../../frontend/dist/", import.meta.url));
 export function createApp(options) {
   const app = express();
   app.disable("x-powered-by");
-  app.use((_req, res, next) => {
-    res.set({
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-      "Referrer-Policy": "no-referrer",
-      "X-Frame-Options": "DENY",
-    });
-    next();
-  });
+  app.use(setSecurityHeaders);
   app.use("/api/health", healthRouter(options));
   app.use("/api", express.json({ limit: "16kb" }), browseRouter(options));
   const entry = path.join(webRoot, "index.html");
@@ -46,39 +42,7 @@ export function createApp(options) {
       },
     );
   }
-  app.use((_req, res) =>
-    res.status(404).json(publicError(new PipelineError("NOT_FOUND"))),
-  );
-  app.use((error, _req, res, next) => {
-    // Express owns error handling once a response has started streaming.
-    if (res.headersSent) return next(error);
-    const input =
-      error instanceof URIError ||
-      error.type === "entity.parse.failed" ||
-      error.type === "entity.too.large";
-    const busy = error.code?.startsWith("SQLITE_BUSY");
-    const envelope = publicError(
-      input
-        ? new PipelineError("BAD_REQUEST")
-        : busy
-          ? new PipelineError("DATABASE_BUSY")
-          : error,
-    );
-    options.logger?.error("http_error", {
-      stage: "http",
-      error_code: envelope.error.code,
-    });
-    res
-      .status(
-        input
-          ? (error.status ?? 400)
-          : busy
-            ? 503
-            : error instanceof PipelineError
-              ? (error.statusCode ?? 500)
-              : 500,
-      )
-      .json(envelope);
-  });
+  app.use(notFound);
+  app.use(createHttpErrorHandler(options.logger));
   return app;
 }

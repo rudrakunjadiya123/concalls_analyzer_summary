@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { readConfig } from "../../../backend/src/config/env.js";
-import { openDatabase } from "../../../backend/src/db/connection.js";
-import { requestReplay } from "../../../backend/src/ingestion/replay.js";
+import { openDatabase } from "../../../backend/src/config/database.js";
+import { requestReplay } from "../../../backend/src/services/ingestion/replay.js";
 import { startApi } from "../../../backend/src/index.js";
 
 test("a fixture push changes the watchlist, a disconnected browser replays its correction, and both revisions open", async ({
@@ -170,6 +170,11 @@ test("a fixture push changes the watchlist, a disconnected browser replays its c
         payload.data.json.guidance = [];
         payload.data.json.call_date = null;
         payload.data.markdown = script;
+        // Summary pages keep evidence available while omitting validation and coverage panels.
+        payload.data.validation.warnings = [
+          "conflicting_metrics_retained_with_context",
+          "omitted_key_metrics",
+        ];
         payload.data.sources = [
           {
             source: "NSE",
@@ -181,10 +186,18 @@ test("a fixture push changes the watchlist, a disconnected browser replays its c
       { times: 1 },
     );
     await page.reload();
-    await expect(page.getByText("No verified items.").first()).toBeVisible();
     await expect(
-      page.getByText("Original filing unavailable", { exact: true }),
+      page.getByText("No explicit management guidance was verified."),
     ).toBeVisible();
+    await expect(
+      page.getByText("Original filing link unverified", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Validation warnings", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByText("Source and coverage notes", { exact: true }),
+    ).toHaveCount(0);
     await page.getByRole("button", { name: "View Markdown" }).click();
     await expect(page.getByLabel("Summary Markdown")).toContainText(
       "<img src=x",
@@ -224,6 +237,7 @@ test("the real-data watchlist explains disabled polling and retries a failed ini
         HOST: "127.0.0.1",
         LOG_LEVEL: "silent",
         DATA_MODE: "authorized-direct",
+        GEMINI_API_KEY: "synthetic-test-key",
       }),
       PORT: 0,
     });

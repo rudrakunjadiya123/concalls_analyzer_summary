@@ -1,13 +1,13 @@
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 import { ConfigError, readConfig } from "./config/env.js";
-import { createLogger } from "./core/logger.js";
-import { publicError } from "./core/errors.js";
-import { openDatabase } from "./db/connection.js";
-import { migrateDatabase } from "./db/migrate.js";
-import { seedWatchlist } from "./db/seed.js";
+import { createLogger } from "./utils/logger.js";
+import { publicError } from "./utils/errors.js";
+import { openDatabase } from "./config/database.js";
+import { migrateDatabase } from "./models/migrate.js";
+import { seedWatchlist } from "./models/seed.js";
 import { createApp } from "./app.js";
-import { createIngestionService } from "./ingestion/service.js";
+import { createIngestionService } from "./services/ingestion/service.js";
 import { attachSummariesSocket } from "./ws/server.js";
 
 /** Initialize local state and start the HTTP listener with a close hook for callers. */

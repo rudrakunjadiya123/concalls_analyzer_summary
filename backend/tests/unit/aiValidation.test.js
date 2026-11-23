@@ -1,14 +1,26 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { summarySchema } from "@finosauras/shared";
-import { createMockProvider } from "../../src/ai/mock.js";
-import { createGeminiProvider } from "../../src/ai/gemini.js";
-import { chunkDocument, estimateTokens } from "../../src/ai/chunk.js";
-import { verifyAndConsolidate } from "../../src/ai/evidence.js";
-import { selectionSchema } from "../../src/ai/contracts.js";
-import { extractPdf } from "../../src/pdf/extract.js";
-import { synthesisInput, verifySelection } from "../../src/summary/verify.js";
-import { renderMarkdown } from "../../src/summary/markdown.js";
+import { createMockProvider } from "../../src/services/ai/mock.js";
+import { createGeminiProvider } from "../../src/services/ai/gemini.js";
+import {
+  chunkDocument,
+  estimateTokens,
+  evidenceUnits,
+} from "../../src/services/ai/chunk.js";
+import {
+  metricEvidence,
+  qaTurns,
+  verifyAndConsolidate,
+} from "../../src/services/ai/evidence.js";
+import { callHeaderEvidence } from "../../src/services/transcript/period.js";
+import { selectionSchema } from "../../src/services/ai/contracts.js";
+import { extractPdf } from "../../src/services/pdf/extract.js";
+import {
+  synthesisInput,
+  verifySelection,
+} from "../../src/services/summary/verify.js";
+import { renderMarkdown } from "../../src/services/summary/markdown.js";
 import { makeFixturePdf } from "../../scripts/stage3-pdf-fixtures.js";
 
 const config = { target: 6000, overlap: 300, maxTotal: 160_000 };
@@ -52,6 +64,215 @@ async function verifyFixture(bytes, options = config) {
 }
 
 describe("local evidence pipeline", () => {
+  it("uses a printed participant roster for standalone labels across page boundaries", async () => {
+    const pages = [
+      [
+        "Earnings Conference Call",
+        "C O R P O R A T E P A R T I C I P A N T S:",
+        "Avery Rao",
+        "Chief Financial Officer",
+        "Morgan Das (Emcee)",
+        "Corporate Communications",
+      ],
+      [
+        "Morgan Das",
+        "The first question is from Casey Patel from Fictional Research.",
+        "Casey Patel",
+        "How do you expect operating costs to change next year?",
+      ],
+      [
+        "Avery Rao",
+        "We expect operating costs to rise from the current level next year.",
+        "Our operating margin was 15%.",
+      ],
+    ];
+    const manifest = await extractPdf(
+      makeFixturePdf(
+        pages.map((lines) =>
+          lines.map((text, index) => [40, 725 - index * 28, text]),
+        ),
+      ),
+    );
+    const units = evidenceUnits(manifest, {
+      rosterLabels: true,
+      richerEvidence: true,
+    });
+    expect(units.every(({ page }) => page > 1)).toBe(true);
+    expect(
+      units.find(({ text }) => text.startsWith("The first question")),
+    ).toMatchObject({
+      kind: "unattributed",
+      speaker: "Morgan Das",
+    });
+    expect(
+      units.find(({ text }) => text.startsWith("How do you expect")),
+    ).toMatchObject({
+      kind: "qa_question",
+      speaker: "Casey Patel",
+      page: 2,
+    });
+    expect(
+      units.find(({ text }) => text.startsWith("We expect")),
+    ).toMatchObject({
+      kind: "management",
+      speaker: "Avery Rao",
+      page: 3,
+    });
+    expect(qaTurns(units, { richerEvidence: true }).pairs.size).toBe(1);
+  });
+
+  it("recovers the call heading and named dialogue after a signed cover letter", async () => {
+    const pdf = makeFixturePdf([
+      [
+        [40, 725, "October 28, 2022"],
+        [40, 705, "Listing Department"],
+        [40, 685, "Chief Manager: Enclosed is the transcript."],
+      ],
+      [
+        [40, 725, "Fictional Bank Limited"],
+        [
+          40,
+          705,
+          "Earnings conference call - Quarter ended September 30, 2022 (Q2-2023)",
+        ],
+        [40, 685, "On October 22, 2022"],
+        [40, 645, "Moderator: Welcome to the earnings call."],
+        [
+          40,
+          625,
+          "I now hand the conference over to Mr. Avery Rao -- Managing Director.",
+        ],
+        [40, 605, "Mr. Rao's opening remarks"],
+        [
+          40,
+          585,
+          "Profit after tax grew by 37.1% year-on-year to 75.58 billion Rupees.",
+        ],
+        [
+          40,
+          545,
+          "Moderator: The first question is from the line of Casey Das from Fictional Research.",
+        ],
+        [
+          40,
+          505,
+          "Casey Das: What level of operating margin do you expect next year?",
+        ],
+      ],
+      [
+        [
+          40,
+          725,
+          "Avery Rao: We expect margins to recover toward 14% next year.",
+        ],
+        [40, 705, "Our new business line is still growing."],
+      ],
+    ]);
+    const manifest = await extractPdf(pdf);
+    expect(callHeaderEvidence(manifest, 4)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "call_date",
+          value: "2022-10-22",
+          page_number: 2,
+        }),
+        expect.objectContaining({
+          field: "quarter",
+          value: "Q2 FY23",
+          page_number: 2,
+        }),
+      ]),
+    );
+    const units = evidenceUnits(manifest, { richerEvidence: true });
+    expect(units.every(({ page }) => page > 1)).toBe(true);
+    expect(
+      units.find(({ text }) => text.startsWith("Profit after tax")),
+    ).toMatchObject({
+      kind: "management",
+      speaker: "Avery Rao",
+    });
+    expect(qaTurns(units, { richerEvidence: true }).pairs.size).toBe(1);
+  });
+
+  it("binds the named metric to its printed current level and preserves currency", () => {
+    const quote =
+      "Profit after tax grew by 37.1% year-on-year to 75.58 billion Rupees in Q2-2023.";
+    const metric = {
+      name: "Profit after tax",
+      value_original: "75.58 billion Rupees",
+      unit: null,
+      basis: null,
+      comparison: null,
+    };
+    const options = { richerEvidence: true };
+    expect(metricEvidence(quote, metric, options)).toMatchObject({
+      period: "Q2-2023",
+      metric: {
+        value_original: "75.58 billion Rupees",
+        comparison: "year-on-year",
+      },
+    });
+    expect(
+      metricEvidence(quote, { ...metric, value_original: "37.1%" }, options),
+    ).toBeNull();
+    expect(
+      metricEvidence(
+        "Profit after tax was 75.58 billion Rupees versus 70.23 billion Rupees.",
+        { ...metric, value_original: "70.23 billion Rupees" },
+        options,
+      ),
+    ).toBeNull();
+    expect(
+      metricEvidence(
+        "Profit after tax and net interest income were 75.58 billion Rupees and 85 billion Rupees.",
+        metric,
+        options,
+      ),
+    ).toBeNull();
+  });
+
+  it("attributes named executives from comma-delimited introductions in the new local verifier", async () => {
+    const manifest = await extractPdf(
+      makeFixturePdf([
+        [
+          [
+            40,
+            725,
+            "Moderator: Welcome to the call with Casey Rao, Executive Director,",
+          ],
+          [
+            40,
+            705,
+            "and Avery Das, Group Chief Financial Officer, of the fictional issuer.",
+          ],
+          [40, 665, "Casey Rao: The operating margin was 15%."],
+          [40, 625, "Avery Das: Capital spending reached Rs. 20 crore."],
+          [40, 585, "Taylor Shah: Could the team discuss capital spending?"],
+        ],
+      ]),
+    );
+    const current = evidenceUnits(manifest, { extendedExecutiveTitles: true });
+    expect(
+      current.find(({ text }) => text.startsWith("The operating margin")),
+    ).toMatchObject({
+      speaker: "Casey Rao",
+      kind: "management",
+    });
+    expect(
+      current.find(({ text }) => text.startsWith("Capital spending")),
+    ).toMatchObject({
+      speaker: "Avery Das",
+      kind: "management",
+    });
+    expect(
+      current.find(({ speaker }) => speaker === "Taylor Shah").kind,
+    ).not.toBe("management");
+    expect(
+      evidenceUnits(manifest).find(({ speaker }) => speaker === "Casey Rao")
+        .kind,
+    ).toBe("unattributed");
+  });
+
   it("retains exact figures, reporting basis and distinct periods while separating guidance and analyst speculation", async () => {
     const { result } = await verifyFixture(fixture);
     expect(summarySchema.parse(result.summary)).toEqual(result.summary);
@@ -318,13 +539,7 @@ function sdk(response) {
 }
 
 describe("Gemini SDK contract, injected responses only", () => {
-  it("ranks locally verified highlights with one small Gemini selection", async () => {
-    const client = sdk(async () => ({ text: '{"ids":[3,1,2]}' }));
-    const provider = createGeminiProvider({
-      model: "test-model",
-      client,
-      factMode: "extractive",
-    });
+  it("uses Gemini to map facts and choose each summary section", async () => {
     const units = [
       "Quarterly revenue rose by 8 percent.",
       "The company opened two plants.",
@@ -337,26 +552,49 @@ describe("Gemini SDK contract, injected responses only", () => {
       page: 2,
       text,
     }));
+    const ids = units.map((_, index) => `gemini-1-${index + 1}`);
+    const selection = {
+      tldr: [ids[2], ids[0], ids[1]],
+      management_commentary: ids,
+      guidance: [],
+      segment_performance: [],
+      key_metrics: [],
+      notable_qa: [],
+      risks: [],
+    };
+    const client = sdk(async ({ contents }) => ({
+      text: JSON.stringify(
+        JSON.parse(contents).units
+          ? {
+              facts: units.map(({ id }) => ({
+                unit_id: id,
+                category: "commentary",
+                period: null,
+                metric: null,
+                segment: null,
+                modality: "historical",
+                extraction_confidence: "high",
+              })),
+            }
+          : selection,
+      ),
+    }));
+    const provider = createGeminiProvider({ model: "test-model", client });
     const mapped = await provider.generateFacts({ chunk: { units } });
-    expect(client.models.generateContent).not.toHaveBeenCalled();
-    const commentary = mapped.facts.filter(
-      (fact) => fact.category === "commentary",
-    );
+    expect(client.models.generateContent).toHaveBeenCalledTimes(2);
+    expect(mapped.facts.map(({ fact_id }) => fact_id)).toEqual(ids);
     expect(
       await provider.synthesize({
-        verifiedFacts: commentary,
+        verifiedFacts: mapped.facts,
         qaOptions: [],
         verifiedMetadata: {},
       }),
-    ).toMatchObject({
-      tldr: [
-        commentary[2].fact_id,
-        commentary[0].fact_id,
-        commentary[1].fact_id,
-      ],
-      management_commentary: commentary.map((fact) => fact.fact_id),
-    });
-    expect(client.models.generateContent).toHaveBeenCalledTimes(2);
+    ).toEqual(selection);
+    expect(client.models.generateContent).toHaveBeenCalledTimes(3);
+    expect(
+      JSON.parse(client.models.generateContent.mock.calls[2][0].contents)
+        .verifiedFacts,
+    ).toEqual(mapped.facts);
   });
 
   it("probes structured output once and sends independently Zod-checked JSON schemas", async () => {
@@ -400,6 +638,54 @@ describe("Gemini SDK contract, injected responses only", () => {
       output: 12,
     });
     expect(provider.status()).toMatchObject({ configured: true, probed: true });
+  });
+
+  it("uses Gemini's ranking for takeaways and keeps verified findings in their mapped sections", async () => {
+    const client = sdk(async () => ({
+      text: '{"tldr":[4,2,1,3],"ranked":[2,4],"qa":[1]}',
+    }));
+    const provider = createGeminiProvider({ model: "test-model", client });
+    const verifiedFacts = [
+      {
+        fact_id: "profit",
+        category: "commentary",
+        modality: "historical",
+        claim: "The bank posted higher profit.",
+      },
+      {
+        fact_id: "retail",
+        category: "segment",
+        modality: "historical",
+        claim: "The retail business grew strongly.",
+      },
+      {
+        fact_id: "funding",
+        category: "guidance",
+        modality: "forward_looking",
+        claim: "We expect deposit costs to rise.",
+      },
+      {
+        fact_id: "analyst",
+        category: "qa",
+        modality: "analyst_question",
+        claim: "Why did the loan mix change?",
+      },
+    ];
+    const qaOptions = [{ question_ids: ["analyst"], answer_ids: ["funding"] }];
+    await expect(
+      provider.synthesize({
+        verifiedFacts,
+        verifiedMetadata: {},
+        qaOptions,
+        richerEvidence: true,
+      }),
+    ).resolves.toMatchObject({
+      tldr: ["retail", "profit", "funding"],
+      management_commentary: ["profit"],
+      segment_performance: ["retail"],
+      guidance: ["funding"],
+      notable_qa: qaOptions,
+    });
   });
 
   it("attaches exact local wording and page evidence to a model's unit selection", async () => {

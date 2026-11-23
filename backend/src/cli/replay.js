@@ -1,10 +1,10 @@
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { readConfig } from "../config/env.js";
-import { openDatabase } from "../db/connection.js";
-import { migrateDatabase } from "../db/migrate.js";
-import { requestReplay } from "../ingestion/replay.js";
-import { publicError } from "../core/errors.js";
+import { openDatabase } from "../config/database.js";
+import { migrateDatabase } from "../models/migrate.js";
+import { requestReplay } from "../services/ingestion/replay.js";
+import { publicError } from "../utils/errors.js";
 
 // Administration remains local. The running worker processes the persisted request.
 export function main() {

@@ -6,50 +6,56 @@ Finosauras turns earnings-call transcript PDFs into structured JSON and Markdown
 
 ## Quick start
 
-With Docker and Docker Compose installed, run this from the repository root.
-
-```sh
-docker compose up --build
-```
-
-Open [localhost:3000](http://localhost:3000). On a fresh checkout without a private `.env`, the app uses the fixture profile and processes a bundled fictional transcript. Fixture mode needs no exchange credentials or Gemini key. If a private `.env` exists, Compose uses its configured profile.
-
-The Compose volume keeps SQLite, saved summaries, and private PDF and extraction artifacts across container restarts. `docker compose down` keeps the volume. Use `docker compose ps` to check health and `docker compose logs -f app` to follow startup.
-
-### Run without Docker
-
-Install Node.js 22.12 or later in the Node.js 22 release line. Run the following from the repository root.
+Install Node.js 22.12 or later in the Node.js 22 release line. From the repository root, install dependencies and start the app.
 
 ```sh
 npm ci
+npm run start:local
+```
+
+Open [localhost:3000](http://localhost:3000). `start:local` builds the frontend and serves it with the API and WebSocket in one process. After the first install, run `npm run start:local` again to start the app. Press Ctrl+C to stop it.
+
+On a fresh checkout, the app uses the fixture profile and processes a bundled fictional transcript. Fixture mode needs no exchange credentials or Gemini key. Private settings go in `backend/.env`. `DATA_DIR` stores the SQLite database, saved summaries, private PDFs, and extraction artifacts across restarts. Its default is `./data`.
+
+### Development
+
+For live code reloading, run this after installing dependencies.
+
+```sh
 npm run dev
 ```
 
-Open the URL printed by Vite. The development server proxies API and WebSocket calls to the backend. For a local production-style build, run `npm run build` followed by `npm start` and open [localhost:3000](http://localhost:3000).
+Open the URL printed by Vite. The development server proxies API and WebSocket calls to the backend.
 
 ## Architecture
 
-![Finosauras architecture showing source adapters, the SQLite job queue, page-aware PDF extraction, Gemini, evidence validation, REST, WebSocket and React](docs/readme-assets/architecture.png)
+```mermaid
+flowchart LR
+    Sources["Exchange feeds or local PDFs"] --> Pipeline["Node.js ingestion and summarization"]
+    Pipeline --> Database["SQLite summaries, evidence, and events"]
+    Database --> API["Express REST and WebSocket"]
+    API --> Browser["React dashboard"]
+```
 
-The supplied diagram predates the directory reorganization. The current project has separate npm lockfiles under `frontend/` and `backend/`, with the shared Zod contracts in [backend/shared](backend/shared/). Each app installs its own dependencies.
+The project has separate npm lockfiles under `frontend/` and `backend/`. The shared Zod contracts live in [backend/shared](backend/shared/). The [original architecture illustration](docs/readme-assets/architecture.png) shows the earlier deployment layout.
 
 | Layer                     | Implementation                                                                                                            |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Sources                   | A common filing adapter interface for approved NSE, BSE, and licensed feeds, bundled fixtures, and operator-supplied PDFs |
 | Ingestion                 | Node.js and Undici for discovery, bounded downloads, durable job leases, retries, and recovery                            |
 | Extraction and validation | PDF.js for text and page positions, Zod for contracts, and application checks for quotes and figures                      |
-| Summarization             | Google Gemini via `@google/genai`, local extractive mode, and a deterministic fictional fixture provider                  |
+| Summarization             | Google Gemini via `@google/genai` for real transcripts and a deterministic provider for fictional fixtures                |
 | Persistence and delivery  | SQLite in WAL mode via `better-sqlite3`, a transactional outbox, Express REST, and native WebSockets via `ws`             |
 | Browser                   | React, React Router, Vite, and Tailwind CSS                                                                               |
 
-The production container runs one Node.js service. Express serves the built React app, API, and WebSocket on the same origin. SQLite stores jobs, polling cursors, revisions, evidence, and committed events. PDF bytes and page maps live in private storage on the persistent volume.
+One local Node.js service runs the pipeline. Express serves the built React app, API, and WebSocket on the same origin. SQLite stores jobs, polling cursors, revisions, evidence, and committed events. PDF bytes and page maps live in private storage under `DATA_DIR`.
 
 ## Processing approach
 
-1. **Discover and filter.** Source adapters normalize issuer details, filing times, and attachment metadata. Automatic discovery scans eligible filings market-wide on a configurable cadence. The eight-company watchlist is the initial dashboard view.
-2. **Download and deduplicate.** The downloader checks permitted hosts, redirects, size, and PDF validity. Attachment identifiers and SHA-256 content hashes help detect repeat filings across sources. Durable cursors and job leases let the pipeline resume after a restart with bounded retries.
+1. **Discover and filter.** Each NSE and BSE polling window checks for the subject `Analysts/Institutional Investor Meet/Con. Call Updates` and the standalone word `transcript` in the description. For matching subjects, the adapter checks linked XBRL XML from approved origins when present. Rows with an empty XBRL field use the exchange announcement details. The eight-company watchlist is the initial dashboard view.
+2. **Download and deduplicate.** The downloader checks permitted hosts, redirects, size, and PDF validity. The pipeline links NSE and BSE copies when their ISIN, call date, quarter, and PDF SHA-256 all match. Different PDF bytes are reviewed separately, and incomplete or conflicting call metadata on identical bytes is held for review. Durable cursors and job leases let the pipeline resume after a restart with bounded retries.
 3. **Extract and classify.** PDF.js preserves page numbers and text positions for the reading order, tables, and speaker blocks. Content checks distinguish transcript dialogue from cover letters and notices. Unconfirmed call dates and quarters stay unknown. Scanned, damaged, or unsupported files can require review.
-4. **Summarize with evidence.** The Gemini path maps page-aware chunks to structured fact candidates and selects supported facts for the final summary. The application checks the schema, source page, quote, and numerical evidence before producing JSON and deterministic Markdown. Local extractive mode builds a summary from the document without a Gemini request.
+4. **Summarize with evidence.** Gemini maps page-aware chunks to structured fact candidates and selects the evidence for each section of a real summary. The application checks the schema, source page, quote, and numerical evidence before producing JSON and deterministic Markdown. If Gemini is unavailable, the worker follows its retry policy and waits for a validated Gemini result before publishing.
 5. **Commit and publish.** The verified summary, evidence, revision, and outbox event are saved atomically. A correction receives a new summary ID while earlier revisions remain available in company history. WebSocket subscribers receive the committed summary and can recover missed events over REST.
 
 ## Screenshots
@@ -84,7 +90,7 @@ Sections with no verified items stay empty. Published risk excerpts retain their
 
 ## Configuration and real transcripts
 
-Use [`.env.example`](.env.example) as the configuration template. Keep credentials in a private `.env`.
+Use [`backend/.env.example`](backend/.env.example) as the configuration template. Keep credentials in a private `backend/.env`.
 
 | Profile             | Use                                                                        |
 | ------------------- | -------------------------------------------------------------------------- |
@@ -94,26 +100,35 @@ Use [`.env.example`](.env.example) as the configuration template. Keep credentia
 
 ### Import an existing PDF
 
-For local extraction without a model key, set the following in `.env`.
+For real transcript summarization, set `GEMINI_API_KEY` in the private `backend/.env` and use this profile for PDF imports with feed polling disabled.
 
 ```dotenv
 DATA_MODE=authorized-direct
 LIVE_POLLING_ENABLED=false
-AI_PROVIDER=extractive
+AI_PROVIDER=gemini
 ```
 
-Recreate the Compose service with `docker compose up -d --wait` after changing its environment. For the example below, select an authorized PDF for ICICI Bank and enter its original HTTPS exchange attachment URL.
+Restart the app after changing its environment. For the example below, select an authorized PDF for ICICI Bank and enter its original HTTPS exchange attachment URL.
 
 ```powershell
 $pdf = Read-Host 'Path to the ICICI Bank transcript PDF'
 $sourceUrl = Read-Host 'Original HTTPS exchange PDF URL'
 if (-not (Test-Path -LiteralPath $pdf -PathType Leaf)) { throw 'PDF file not found' }
-docker compose exec -T app npm run db:verify-watchlist
-docker compose cp "$pdf" app:/tmp/earnings-call.pdf
-docker compose exec -T app npm run ingest:pdf -- --file /tmp/earnings-call.pdf --company ICICIBANK --source-url "$sourceUrl" --authorized --summarize
+npm run db:verify-watchlist
+npm.cmd run ingest:pdf -- --file "$pdf" --company ICICIBANK --source-url "$sourceUrl" --authorized --summarize
 ```
 
-Use `--archive-exchange NSE` or `--archive-exchange BSE` in place of `--source-url` for a local archive with a matching exchange cover page. The app marks its original attachment link as unverified. For Gemini, set `AI_PROVIDER=gemini` and `GEMINI_API_KEY` and use `--summarize` only when you have permission to send that PDF's text to Gemini.
+Use `--archive-exchange NSE` or `--archive-exchange BSE` in place of `--source-url` for a local archive with a matching exchange cover page. The app marks its original attachment link as unverified. The `--summarize` option grants Gemini permission for this PDF. Omit it to import and extract the PDF without requesting a summary.
+
+### Refresh an earlier summary
+
+After a pipeline upgrade, use the summary ID from the dashboard URL to refresh that transcript with Gemini. The PDF needs existing Gemini permission. The previous summary stays in company history and the refresh keeps the same transcript revision.
+
+```powershell
+npm.cmd run summarize:refresh -- --id="$summaryId"
+```
+
+The summary shows page evidence for verified items and labels unverified source links. The summary API includes validation warnings and coverage details.
 
 ### Enable automatic polling
 
@@ -165,10 +180,10 @@ npm run format:check
 npm run build
 npm run --prefix frontend install:browsers
 npm run test:e2e
-npm run smoke:compose
+npm run smoke:stage1
 ```
 
-The latest application verification passed 127 unit and integration tests and two browser tests. Docker startup was healthy, and the six historical summaries remained available after the rebuild. The isolated Compose smoke test exercises WebSocket publication, browser updates, and persistence across container recreation.
+The browser tests exercise WebSocket publication, reconnect and replay, and summary revision history. The startup smoke test reopens the same SQLite storage across two local boots.
 
 Automated exchange ingestion and current-quarter coverage depend on approved feed access. The captured runs use historical imports, and some lack verified original filing links. Text-based PDFs work best. Image-only PDFs, irregular tables, and ambiguous wording can require manual review. Evidence links show what the app used for a claim and make shortcomings such as the captured metric error visible.
 
@@ -176,9 +191,12 @@ Automated exchange ingestion and current-quarter coverage depend on approved fee
 
 ```text
 backend/                  API, adapters, workers, SQLite, and tests
+  src/                    Config, routes, controllers, services, models, middleware, and utilities
   shared/                 Shared schemas and event contracts
+  .env.example            Backend configuration template
 frontend/                 React UI, Vite, and browser tests
 docs/readme-assets/       Supplied screenshots and architecture diagram
-compose.yaml              Container, health check, and persistent volume
-.env.example              Configuration template
+package.json              Local startup, maintenance, and test commands
 ```
+
+See the [backend README](backend/README.md) for file responsibilities and backend commands.

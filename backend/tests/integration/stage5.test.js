@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { summaryEventSchema } from "@finosauras/shared";
 import { readConfig } from "../../src/config/env.js";
-import { openDatabase } from "../../src/db/connection.js";
-import { requestReplay } from "../../src/ingestion/replay.js";
+import { openDatabase } from "../../src/config/database.js";
+import { requestReplay } from "../../src/services/ingestion/replay.js";
 import { startApi } from "../../src/index.js";
 import { exportApprovedSample } from "../../src/cli/exportSamples.js";
 
@@ -323,7 +323,10 @@ describe("Stage 5 HTTP, WebSocket, and durable replay", () => {
     });
     await api.close();
     api = undefined;
-    await start({ DATA_MODE: "authorized-direct" });
+    await start({
+      DATA_MODE: "authorized-direct",
+      GEMINI_API_KEY: "synthetic-test-key",
+    });
     // Switching to an unconfigured real mode must not replay synthetic publications.
     expect(await get("/events/latest")).toMatchObject({
       data: { last_event_id: 0 },

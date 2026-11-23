@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { extractPdf } from "../../src/pdf/extract.js";
-import { normalizeCompleteText } from "../../src/pdf/clean.js";
-import { classifyTranscript } from "../../src/transcript/classify.js";
-import { extractMetadata } from "../../src/transcript/period.js";
+import { extractPdf } from "../../src/services/pdf/extract.js";
+import { normalizeCompleteText } from "../../src/services/pdf/clean.js";
+import { classifyTranscript } from "../../src/services/transcript/classify.js";
+import { extractMetadata } from "../../src/services/transcript/period.js";
 import {
   columns,
   makeFixturePdf,

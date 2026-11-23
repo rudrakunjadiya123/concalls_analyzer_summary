@@ -1,12 +1,12 @@
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { createLogger } from "../core/logger.js";
-import { PipelineError, publicError } from "../core/errors.js";
+import { createLogger } from "../utils/logger.js";
+import { PipelineError, publicError } from "../utils/errors.js";
 import { readConfig } from "../config/env.js";
-import { openDatabase } from "../db/connection.js";
-import { migrateDatabase } from "../db/migrate.js";
-import { seedWatchlist } from "../db/seed.js";
-import { createIngestionService } from "../ingestion/service.js";
+import { openDatabase } from "../config/database.js";
+import { migrateDatabase } from "../models/migrate.js";
+import { seedWatchlist } from "../models/seed.js";
+import { createIngestionService } from "../services/ingestion/service.js";
 
 async function main() {
   let logger = createLogger();
@@ -28,6 +28,7 @@ async function main() {
         "extract",
         "summarize",
         "import-pdf",
+        "refresh-summary",
       ].includes(command)
     )
       throw new PipelineError("CONFIG_INVALID");
@@ -45,9 +46,11 @@ async function main() {
               authorized: { type: "boolean" },
               summarize: { type: "boolean" },
             }
-          : command === "backfill"
-            ? { company: { type: "string" }, days: { type: "string" } }
-            : {},
+          : command === "refresh-summary"
+            ? { id: { type: "string" } }
+            : command === "backfill"
+              ? { company: { type: "string" }, days: { type: "string" } }
+              : {},
     });
     const maximumDays = config.INITIAL_BACKFILL_DAYS;
     const days = values.days === undefined ? maximumDays : Number(values.days);
@@ -72,6 +75,19 @@ async function main() {
     migrateDatabase(db);
     seedWatchlist(db);
     const ingestion = createIngestionService(db, config, { logger });
+    if (command === "refresh-summary") {
+      if (
+        !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu.test(values.id ?? "")
+      )
+        throw new PipelineError("CONFIG_INVALID");
+      const result = await ingestion.refreshSummary(
+        values.id,
+        controller.signal,
+      );
+      console.log(JSON.stringify(result));
+      if (result.status !== "published") process.exitCode = 1;
+      return;
+    }
     if (command === "import-pdf") {
       const result = await ingestion.importPdf(
         {

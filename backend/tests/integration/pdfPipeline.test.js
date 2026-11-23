@@ -11,21 +11,21 @@ import path from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { normalizedFilingSchema } from "@finosauras/shared";
 import { readConfig } from "../../src/config/env.js";
-import { openDatabase } from "../../src/db/connection.js";
-import { migrateDatabase } from "../../src/db/migrate.js";
-import { seedWatchlist } from "../../src/db/seed.js";
-import { atomicWrite } from "../../src/core/storage.js";
-import { sha256, documentStorageKey } from "../../src/core/hash.js";
-import { createIngestionService } from "../../src/ingestion/service.js";
+import { openDatabase } from "../../src/config/database.js";
+import { migrateDatabase } from "../../src/models/migrate.js";
+import { seedWatchlist } from "../../src/models/seed.js";
+import { atomicWrite } from "../../src/utils/storage.js";
+import { sha256, documentStorageKey } from "../../src/utils/hash.js";
+import { createIngestionService } from "../../src/services/ingestion/service.js";
 import {
   backfillDocumentSources,
   createPdfRepository,
   registerDocumentSource,
-} from "../../src/jobs/pdfRepository.js";
+} from "../../src/models/jobs/pdfRepository.js";
 import {
   loadExtraction,
   materializeExtraction,
-} from "../../src/pdf/artifacts.js";
+} from "../../src/services/pdf/artifacts.js";
 import { inspectTranscript } from "../../src/cli/inspectTranscript.js";
 import {
   makeFixturePdf,

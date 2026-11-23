@@ -2,12 +2,12 @@ import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { readConfig } from "../config/env.js";
-import { openDatabase } from "../db/connection.js";
-import { decodeJson } from "../db/queries.js";
-import { migrateDatabase } from "../db/migrate.js";
-import { PipelineError, publicError } from "../core/errors.js";
-import { extractionQualitySchema } from "../pdf/artifacts.js";
-import { reviewMetadataSchema } from "../transcript/canonicalize.js";
+import { openDatabase } from "../config/database.js";
+import { decodeJson } from "../models/queries.js";
+import { migrateDatabase } from "../models/migrate.js";
+import { PipelineError, publicError } from "../utils/errors.js";
+import { extractionQualitySchema } from "../services/pdf/artifacts.js";
+import { reviewMetadataSchema } from "../services/transcript/canonicalize.js";
 
 /** Return useful local diagnostics while keeping private transcript text, URLs and storage paths out. */
 export function inspectTranscript(db, id) {

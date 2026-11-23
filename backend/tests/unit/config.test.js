@@ -3,12 +3,12 @@ import { readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { describe, expect, it } from "vitest";
 import { readConfig, sourceGrants } from "../../src/config/env.js";
-import { publicError } from "../../src/core/errors.js";
+import { publicError } from "../../src/utils/errors.js";
 
 describe("environment configuration", () => {
   it("uses all documented defaults and disables external source access", () => {
     const example = parseEnv(
-      readFileSync(new URL("../../../.env.example", import.meta.url), "utf8"),
+      readFileSync(new URL("../../.env.example", import.meta.url), "utf8"),
     );
     const defaults = readConfig({});
     // The example must stay complete and behave just like a blank environment.
@@ -32,6 +32,7 @@ describe("environment configuration", () => {
 
   it.each([
     ["DATA_MODE", "live"],
+    ["AI_PROVIDER", "extractive"],
     ["POLL_INTERVAL_SECONDS", "5.5"],
     ["POLL_INTERVAL_SECONDS", "0"],
     ["MAX_DOWNLOAD_BYTES", "-1"],
@@ -54,6 +55,7 @@ describe("environment configuration", () => {
     const direct = {
       DATA_MODE: "authorized-direct",
       LIVE_POLLING_ENABLED: "true",
+      GEMINI_API_KEY: "synthetic-test-key",
     };
     expect(() => readConfig(direct)).toThrow(
       expect.objectContaining({ code: "CONFIG_INVALID" }),
@@ -85,6 +87,7 @@ describe("environment configuration", () => {
     const licensed = {
       DATA_MODE: "licensed-feed",
       LIVE_POLLING_ENABLED: "true",
+      GEMINI_API_KEY: "synthetic-test-key",
       LICENSED_FEED_URL: "https://feed.example.com",
       LICENSED_FEED_REQUIRES_TOKEN: "true",
     };
@@ -111,7 +114,7 @@ describe("environment configuration", () => {
   });
 
   it("reports a missing Gemini key and hides rejected config values", () => {
-    expect(() => readConfig({ AI_PROVIDER: "gemini" })).toThrow(
+    expect(() => readConfig({ DATA_MODE: "authorized-direct" })).toThrow(
       expect.objectContaining({
         fields: ["GEMINI_API_KEY"],
       }),
@@ -130,5 +133,22 @@ describe("environment configuration", () => {
       });
       expect(JSON.stringify(error)).not.toContain("synthetic-secret");
     }
+  });
+
+  it("requires Gemini for real data and limits the mock to fixtures", () => {
+    const live = {
+      DATA_MODE: "authorized-direct",
+      GEMINI_API_KEY: "synthetic-test-key",
+    };
+    expect(readConfig(live).AI_PROVIDER).toBe("gemini");
+    expect(() => readConfig({ ...live, AI_PROVIDER: "mock" })).toThrow(
+      expect.objectContaining({ fields: ["AI_PROVIDER"] }),
+    );
+    expect(() =>
+      readConfig({
+        AI_PROVIDER: "gemini",
+        GEMINI_API_KEY: "synthetic-test-key",
+      }),
+    ).toThrow(expect.objectContaining({ fields: ["AI_PROVIDER"] }));
   });
 });

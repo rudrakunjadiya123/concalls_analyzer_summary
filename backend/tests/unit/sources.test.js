@@ -1,9 +1,9 @@
 import { expect, it, vi } from "vitest";
-import { createNseSource } from "../../src/sources/nse.js";
-import { createBseSource } from "../../src/sources/bse.js";
-import { createLicensedSource } from "../../src/sources/licensed.js";
-import { classifyFiling } from "../../src/ingestion/eligibility.js";
-import { createSourceHttp } from "../../src/core/source-http.js";
+import { createNseSource } from "../../src/services/sources/nse.js";
+import { createBseSource } from "../../src/services/sources/bse.js";
+import { createLicensedSource } from "../../src/services/sources/licensed.js";
+import { classifyFiling } from "../../src/services/ingestion/eligibility.js";
+import { createSourceHttp } from "../../src/utils/source-http.js";
 import { fakeAddresses, fixtureJson, response } from "../fixtures/ingestion.js";
 
 const company = {

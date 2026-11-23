@@ -1,10 +1,10 @@
 import path from "node:path";
 import { z } from "zod";
-import { AI_PROVIDERS, DATA_MODES } from "@finosauras/shared/constants";
-import { PipelineError } from "../core/errors.js";
-import { LOG_LEVELS } from "../core/logger.js";
-import { parseSourceUrl } from "../core/security.js";
-import { resolveDatabasePath } from "../core/storage.js";
+import { DATA_MODES } from "@finosauras/shared/constants";
+import { PipelineError } from "../utils/errors.js";
+import { LOG_LEVELS } from "../utils/logger.js";
+import { parseSourceUrl } from "../utils/security.js";
+import { resolveDatabasePath } from "../utils/storage.js";
 
 const flag = (fallback) =>
   z
@@ -52,7 +52,7 @@ const schema = z.object({
     .string()
     .trim()
     .regex(/^[a-zA-Z0-9.:-]+$/u)
-    .default("0.0.0.0"),
+    .default("127.0.0.1"),
   DATA_DIR: z.string().trim().min(1).default("./data"),
   DATABASE_PATH: blank,
   DATA_MODE: z.enum(DATA_MODES).default("fixture"),
@@ -84,11 +84,10 @@ const schema = z.object({
   MAX_CONCURRENT_LLM_CALLS: integer(1, 1, 8),
   MAX_JOB_ATTEMPTS: integer(4),
   WORKER_LEASE_SECONDS: integer(300),
-  AI_PROVIDER: z.enum(AI_PROVIDERS).default("mock"),
+  AI_PROVIDER: z.enum(["mock", "gemini"]).optional(),
   GEMINI_API_KEY: blank,
   // Blank model settings in a copied environment use the same default as unset ones.
   GEMINI_MODEL: blank.transform((value) => value || "gemini-3.5-flash-lite"),
-  GEMINI_FACT_MODE: z.enum(["model", "extractive"]).default("model"),
   AI_CHUNK_TARGET_TOKENS: integer(6000),
   AI_CHUNK_OVERLAP_TOKENS: integer(300, 0),
   MAX_AI_INPUT_TOKENS_PER_DOC: integer(160000),
@@ -139,6 +138,11 @@ export function readConfig(env = process.env, { cwd = process.cwd() } = {}) {
     throw new ConfigError(parsed.error.issues.map((issue) => issue.path[0]));
   const config = parsed.data;
   const invalid = [];
+  const requiredProvider = config.DATA_MODE === "fixture" ? "mock" : "gemini";
+  // Real transcripts must use Gemini. The mock belongs to the synthetic profile.
+  if (config.AI_PROVIDER && config.AI_PROVIDER !== requiredProvider)
+    invalid.push("AI_PROVIDER");
+  config.AI_PROVIDER ??= requiredProvider;
   const grants = sourceGrants(config);
   if (
     config.LIVE_POLLING_ENABLED &&

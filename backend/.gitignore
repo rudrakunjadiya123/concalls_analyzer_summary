@@ -1,0 +1,6 @@
+# Backend-local settings and generated output.
+.env
+.env.*
+!.env.example
+node_modules/
+coverage/

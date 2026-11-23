@@ -9,7 +9,7 @@ import {
   transcriptBlockSchema,
 } from "@finosauras/shared";
 import { describe, expect, it } from "vitest";
-import { parseNormalizedFiling } from "../../src/domain/filing.js";
+import { parseNormalizedFiling } from "../../src/models/filing.js";
 
 // Synthetic contract examples. These records make no claim about a real filing or earnings call.
 const publishedAt = "2026-11-22T18:30:00.000Z";
