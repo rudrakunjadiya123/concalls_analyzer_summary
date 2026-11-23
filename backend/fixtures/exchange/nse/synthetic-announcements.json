@@ -1,0 +1,20 @@
+[
+  {
+    "seq_id": "SYN-NSE-001",
+    "symbol": "INFY",
+    "sm_name": "Synthetic fixture",
+    "desc": "Updates",
+    "attchmntText": "Synthetic earnings call transcript enclosed",
+    "attchmntFile": "https://documents.example.invalid/synthetic-transcript.pdf",
+    "an_dt": "26-Oct-2026 15:30:00",
+    "category": "Miscellaneous"
+  },
+  {
+    "seq_id": "SYN-NSE-002",
+    "symbol": "INFY",
+    "desc": "Invitation to an earnings call",
+    "attchmntText": "The transcript will be made available later",
+    "attchmntFile": "https://documents.example.invalid/synthetic-invitation.pdf",
+    "exchdisstime": "2026-10-26T16:00:00+05:30"
+  }
+]

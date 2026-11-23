@@ -1,0 +1,15 @@
+{
+  "Table": [
+    {
+      "NEWSID": "SYN-BSE-002",
+      "SCRIP_CD": "500209",
+      "NEWSSUB": "Covering letter for transcript of earnings call",
+      "ATTACHMENTNAME": "synthetic-cover-letter.pdf",
+      "PDFFLAG": 1,
+      "AUDIO_VIDEO_FILE": "https://documents.example.invalid/synthetic-audio.mp3",
+      "DissemDT": "2026-10-26 16:10:00",
+      "QUARTER_ID": 42
+    }
+  ],
+  "Table1": [{ "ROWCNT": "2" }]
+}

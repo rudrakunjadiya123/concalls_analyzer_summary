@@ -1,0 +1,29 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+.env
+.env.*
+!.env.example
+data/
+*.sqlite*
+*.db
+*.db-*
+*.pdf
+!backend/fixtures/pdf/**/*.pdf
+*.log
+*.tmp
+*.temp
+tmp/
+.tmp/
+docs/
+# Keep the README image assets available in checkouts.
+!/docs/
+/docs/*
+!/docs/readme-assets/
+data/
+.data/
+transcripts/
+FINOSAURAS_CODEX_MASTER_SPEC.md
+Assignment (1).pdf

@@ -1,0 +1,18 @@
+[
+  {
+    "seqId": null,
+    "symbol": "INFY",
+    "companyName": "Synthetic fixture",
+    "subject": "Audio recording of investor call",
+    "attachmentUrl": "https://documents.example.invalid/synthetic.mp3",
+    "category": null,
+    "unknownOptionalField": true
+  },
+  {
+    "seqId": 10003,
+    "symbol": "INFY",
+    "subject": "Corrigendum to earnings-call transcript",
+    "attachmentUrl": "https://documents.example.invalid/synthetic-correction.pdf",
+    "exchdisstime": "2026-10-26T11:00:00Z"
+  }
+]

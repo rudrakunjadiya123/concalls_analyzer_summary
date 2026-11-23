@@ -1,0 +1,16 @@
+{
+  "name": "@finosauras/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/schemas.js",
+    "./constants": "./src/constants.js"
+  },
+  "dependencies": {
+    "zod": "^4.1.0"
+  },
+  "files": [
+    "src"
+  ]
+}

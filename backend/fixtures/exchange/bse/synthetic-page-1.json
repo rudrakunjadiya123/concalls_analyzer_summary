@@ -1,0 +1,15 @@
+{
+  "Table": [
+    {
+      "NEWSID": "SYN-BSE-001",
+      "SCRIP_CD": 500209,
+      "SLONGNAME": "Synthetic fixture",
+      "NEWSSUB": "Regulation 30 disclosure",
+      "HEADLINE": "Conference call transcript attached",
+      "ATTACHMENT_URL": "https://documents.example.invalid/synthetic-transcript.pdf",
+      "CATEGORYNAME": "Miscellaneous",
+      "NEWS_DT": "2026-10-26T15:30:00.000000"
+    }
+  ],
+  "Table1": [{ "ROWCNT": 2 }]
+}

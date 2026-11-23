@@ -1,0 +1,92 @@
+%PDF-1.4
+% Synthetic layout fixture 
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /Lang (en-IN) >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [10 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Length 116 >>
+stream
+600 0 0 0 600 800 d1
+65 w
+120 700 m 520 700 l S
+120 505 m 520 505 l S
+170 700 m 490 700 485 330 170 330 c 490 65 l S
+endstream
+endobj
+5 0 obj
+<< /Length 46 >>
+stream
+600 0 0 0 600 800 d1
+75 w
+80 360 m 520 360 l S
+endstream
+endobj
+6 0 obj
+<< /Length 347 >>
+stream
+/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Synthetic) /Ordering (Glyphs) /Supplement 0 >> def
+/CMapName /SyntheticGlyphs def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+2 beginbfchar
+<01> <20B9>
+<02> <2212>
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type3 /FontBBox [0 0 600 800]
+    /FontMatrix [.001 0 0 .001 0 0] /CharProcs << /R 4 0 R /M 5 0 R >>
+    /Encoding << /Type /Encoding /Differences [1 /R /M] >> /FirstChar 1 /LastChar 2 /Widths [600 600]
+    /Resources << >> /ToUnicode 6 0 R >>
+endobj
+8 0 obj
+<< /Type /XObject /Subtype /Image /Width 8 /Height 8 /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /ASCIIHexDecode /Length 129 >>
+stream
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc>
+endstream
+endobj
+9 0 obj
+<< /Length 0 >>
+stream
+
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <<
+      /Font << /F1 3 0 R /Glyph 7 0 R >> /XObject << /Scan 8 0 R >>
+      >> /Contents 9 0 R >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000037 00000 n 
+0000000100 00000 n 
+0000000158 00000 n 
+0000000255 00000 n 
+0000000422 00000 n 
+0000000518 00000 n 
+0000000916 00000 n 
+0000001200 00000 n 
+0000001498 00000 n 
+0000001547 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R >>
+startxref
+1726
+%%EOF

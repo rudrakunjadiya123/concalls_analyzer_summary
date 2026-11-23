@@ -1,0 +1,41 @@
+{
+  "name": "finosauras-concall-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0 <23"
+  },
+  "scripts": {
+    "postinstall": "npm ci --prefix backend --no-audit --no-fund && npm ci --prefix frontend --no-audit --no-fund",
+    "dev": "node backend/node_modules/concurrently/dist/bin/concurrently.js --kill-others --names api,web \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "node --env-file-if-exists=.env --watch backend/src/index.js",
+    "dev:web": "npm run --prefix frontend dev",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "node backend/scripts/check-api-imports.js",
+    "build:web": "npm run --prefix frontend build",
+    "start": "node --env-file-if-exists=.env backend/src/index.js",
+    "test": "node backend/node_modules/vitest/vitest.mjs run --root backend --maxWorkers=2 --testTimeout=15000",
+    "test:unit": "node backend/node_modules/vitest/vitest.mjs run --root backend tests/unit",
+    "test:integration": "node backend/node_modules/vitest/vitest.mjs run --root backend tests/integration --maxWorkers=2 --testTimeout=15000",
+    "smoke:stage1": "node backend/scripts/smoke-stage1.js",
+    "smoke:compose": "node frontend/scripts/smoke-compose.js",
+    "lint": "node backend/node_modules/eslint/bin/eslint.js --config backend/eslint.config.js . --max-warnings 0",
+    "format:check": "node backend/node_modules/prettier/bin/prettier.cjs --check .",
+    "db:migrate": "node --env-file-if-exists=.env backend/src/cli/database.js migrate",
+    "db:seed": "node --env-file-if-exists=.env backend/src/cli/database.js seed",
+    "db:verify-watchlist": "node --env-file-if-exists=.env backend/src/cli/database.js verify-watchlist",
+    "ingest:once": "node --env-file-if-exists=.env backend/src/cli/ingestion.js once",
+    "ingest:pdf": "node --env-file-if-exists=.env backend/src/cli/ingestion.js import-pdf",
+    "backfill": "node --env-file-if-exists=.env backend/src/cli/ingestion.js backfill",
+    "diagnose:sources": "node --env-file-if-exists=.env backend/src/cli/ingestion.js diagnose",
+    "demo:discover": "node --env-file-if-exists=.env backend/src/cli/ingestion.js demo",
+    "extract:fixture": "node --env-file-if-exists=.env backend/src/cli/ingestion.js extract",
+    "inspect:transcript": "node --env-file-if-exists=.env backend/src/cli/inspectTranscript.js",
+    "summarize:fixture": "node --env-file-if-exists=.env backend/src/cli/ingestion.js summarize",
+    "verify:summary": "node --env-file-if-exists=.env backend/src/cli/verifySummary.js",
+    "demo:replay": "node --env-file-if-exists=.env backend/src/cli/replay.js",
+    "export:samples": "node --env-file-if-exists=.env backend/src/cli/exportSamples.js",
+    "test:e2e": "npm run --prefix frontend test:e2e"
+  }
+}

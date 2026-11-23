@@ -1,0 +1,14 @@
+**
+!package.json
+!backend/
+!backend/**
+!frontend/
+!frontend/**
+backend/tests/
+frontend/tests/
+frontend/test-results/
+**/node_modules
+**/dist
+**/.env*
+**/data/
+**/tmp/

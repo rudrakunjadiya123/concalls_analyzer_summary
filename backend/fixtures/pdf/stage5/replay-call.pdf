@@ -1,0 +1,102 @@
+%PDF-1.4
+% Synthetic layout fixture replay-call
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /Lang (en-IN) >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [10 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Length 116 >>
+stream
+600 0 0 0 600 800 d1
+65 w
+120 700 m 520 700 l S
+120 505 m 520 505 l S
+170 700 m 490 700 485 330 170 330 c 490 65 l S
+endstream
+endobj
+5 0 obj
+<< /Length 46 >>
+stream
+600 0 0 0 600 800 d1
+75 w
+80 360 m 520 360 l S
+endstream
+endobj
+6 0 obj
+<< /Length 347 >>
+stream
+/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Synthetic) /Ordering (Glyphs) /Supplement 0 >> def
+/CMapName /SyntheticGlyphs def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+2 beginbfchar
+<01> <20B9>
+<02> <2212>
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type3 /FontBBox [0 0 600 800]
+    /FontMatrix [.001 0 0 .001 0 0] /CharProcs << /R 4 0 R /M 5 0 R >>
+    /Encoding << /Type /Encoding /Differences [1 /R /M] >> /FirstChar 1 /LastChar 2 /Widths [600 600]
+    /Resources << >> /ToUnicode 6 0 R >>
+endobj
+8 0 obj
+<< /Type /XObject /Subtype /Image /Width 8 /Height 8 /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /ASCIIHexDecode /Length 129 >>
+stream
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc>
+endstream
+endobj
+9 0 obj
+<< /Length 1624 >>
+stream
+BT 1 0 0 1 40 745 Tm /F1 11 Tf <53594e5448455449432044454d4f204f4e4c59202d204e4f205245414c20434f4d50414e5920524553554c5453> Tj ET
+BT 1 0 0 1 40 716 Tm /F1 11 Tf <53796e74686574696320496e647573747269616c204561726e696e677320436f6e666572656e63652043616c6c2051332046593237> Tj ET
+BT 1 0 0 1 40 685 Tm /F1 11 Tf <43616c6c2068656c64206f6e203137204e6f76656d6265722032303236> Tj ET
+BT 1 0 0 1 40 650 Tm /F1 11 Tf <4d6f64657261746f723a2057656c636f6d6520746f20746869732066696374696f6e616c206561726e696e67732063616c6c2e> Tj ET
+BT 1 0 0 1 40 620 Tm /F1 11 Tf <4d616e6167656d656e743a20436f6e736f6c69646174656420726576656e75652077617320> Tj /Glyph 11 Tf <01> Tj /F1 11 Tf <3433302063726f726520696e20513320465932372e> Tj ET
+BT 1 0 0 1 40 594 Tm /F1 11 Tf <4d616e6167656d656e743a205374616e64616c6f6e65206f7065726174696e67206d617267696e207761732031312e302520696e20513320465932372e> Tj ET
+BT 1 0 0 1 40 568 Tm /F1 11 Tf <4d616e6167656d656e743a2054686520496e647573747269616c207365676d656e742073686970706564206974732066696374696f6e616c206261636b6c6f672e> Tj ET
+BT 1 0 0 1 40 542 Tm /F1 11 Tf <4d616e6167656d656e743a20537570706c69657220696e74657272757074696f6e2072656d61696e732061206d6174657269616c207269736b2e> Tj ET
+BT 1 0 0 1 40 511 Tm /F1 11 Tf <5175657374696f6e20616e6420416e737765722053657373696f6e> Tj ET
+BT 1 0 0 1 40 483 Tm /F1 11 Tf <416e616c7973743a20486f7720646964206d616e6167656d656e74206d656173757265207468652066696374696f6e616c206f7065726174696e67206d617267696e3f> Tj ET
+BT 1 0 0 1 40 455 Tm /F1 11 Tf <4d616e6167656d656e743a20546865206d656173757265207573657320746865207374616e64616c6f6e65207265706f7274696e672062617369732e> Tj ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources <<
+      /Font << /F1 3 0 R /Glyph 7 0 R >> /XObject << /Scan 8 0 R >>
+      >> /Contents 9 0 R >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000048 00000 n 
+0000000111 00000 n 
+0000000169 00000 n 
+0000000266 00000 n 
+0000000433 00000 n 
+0000000529 00000 n 
+0000000927 00000 n 
+0000001211 00000 n 
+0000001509 00000 n 
+0000003185 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R >>
+startxref
+3364
+%%EOF
